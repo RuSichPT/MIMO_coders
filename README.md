@@ -1,2 +1,2 @@
 # MIMO-coders
-LDPC RIda Solomona
+LDPC, Reed–Solomon
