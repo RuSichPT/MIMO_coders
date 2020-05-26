@@ -1,12 +1,12 @@
 %% ---------Модель MIMO and SISO RS-------- 
 clear;clc;%close all;
 %% Управление
-flag_chanel = 'RAYL';% 'AWGN' ,'RAYL','RIC','RAYL_SPECIAL','STATIC', 'BAD' 
+flag_chanel = 'RAYL_SPECIAL';% 'AWGN' ,'RAYL','RIC','RAYL_SPECIAL','STATIC', 'BAD' 
 flag_cor_MIMO = 1; % 1-коррекция АЧХ (эквалайзер для MIMO) 2-Аламоути
 flag_cor_SISO = 1; % коррекция АЧХ (эквалайзер для SISO)
-flag_wav_MIMO = 0; % вейвлет шумоподавление для MIMO
-flag_wav_SISO = 0; % вейвлет шумоподавление для SISO
-flag_coder_RS = 0; % кодер RS вкл/выкл
+flag_wav_MIMO = 1; % вейвлет шумоподавление для MIMO
+flag_wav_SISO = 1; % вейвлет шумоподавление для SISO
+flag_coder_RS = 1; % кодер RS вкл/выкл
 %% Параметры системы MIMO
 prm.numTx = 2; % Кол-во излучающих антен
 prm.numRx = 2; % Кол-во приемных антен
@@ -22,7 +22,7 @@ prm.Nsymb_ofdm_p = 1; % Кол-во пилотных символов OFDM
 %% Параметры кодера
 M_RS = 5; % Кол-во бит на символ , задаем поле Галуа, степень полинома ДБ 3 <= M_RS <= 16.
 N_RS_max = 2^M_RS-1;
-K_RS = 16; % Кол-во символов RS сообщения ДБ N_RS-K_RS= 2t, где t - кол-во исправимых ошибок
+K_RS = 9; % Кол-во символов RS сообщения ДБ N_RS-K_RS= 2t, где t - кол-во исправимых ошибок
 N_RS = N_RS_max; % Кол-во символов RS кодового слова  ДБ N_RS_max>=N_RS 
 %% Параметры OFDM 
 prm.numSC = 450; % Кол-во поднессущих
@@ -57,23 +57,23 @@ if flag_coder_RS == 1
     rsDecoder = comm.RSDecoder('BitInput',true,'CodewordLength',N_RS,'MessageLength',K_RS);
     rsDecoder_siso = clone(rsDecoder);
     prm.CodeRate = K_RS/N_RS;
-    prm.Nsymb_ofdm = prm.Nsymb_ofdm/10*N_RS;
+    prm.Nsymb_ofdm = N_RS;
 end
 %% Расчет 
-prm.n = prm.bps*prm.Nsymb_ofdm*prm.numSC*prm.numTx*prm.CodeRate;% Длина бинарного потока
+prm.n = round(prm.bps*prm.Nsymb_ofdm*prm.numSC*prm.numTx*prm.CodeRate);% Длина бинарного потока
 prm.n_pilot = prm.Nsymb_ofdm_p*prm.numSC; % Кол-во бит на пилоты SISO
-prm.n_siso = prm.bps_siso*prm.Nsymb_ofdm*prm.numSC*prm.CodeRate;% Длина бинарного потока
+prm.n_siso = round(prm.bps_siso*prm.Nsymb_ofdm*prm.numSC*prm.CodeRate);% Длина бинарного потока
 %% ---------Сам скрипт--------
 if flag_cor_MIMO == 2
     ostbcEnc = comm.OSTBCEncoder('NumTransmitAntennas',prm.numTx);
     ostbcComb = comm.OSTBCCombiner('NumReceiveAntennas',prm.numRx);
     prm.n = prm.n/prm.numTx;
 end
-SNR_MAX = 40;
+SNR_MAX = 20;
 SNR = 0+floor(10*log10(prm.bps)):SNR_MAX+floor(10*log10(prm.bps*prm.numTx));
 prm.MinNumErr = 100; % Порог ошибок для цикла 
 prm.conf_level = 0.95; % Уровень достоверности
-prm.MAX_indLoop = 10;% Максимальное число итераций в цикле while
+prm.MAX_indLoop = 300;% Максимальное число итераций в цикле while
 Koeff = 1/15;%Кол-во процентов от BER  7%
 Exp = 1;% Кол-во опытов
 for indExp = 1:Exp
@@ -94,21 +94,23 @@ for indExp = 1:Exp
             if flag_coder_RS == 1
                 Inp_data = randi([0 1],prm.n,1); % Передаваемые данные
                 EncData = rsEncoder(Inp_data); % Кодер RS
+                IntrData= randintrlv(EncData,prm.SEED); %Перемежитель
             else
                 Inp_data = randi([0 1],prm.n,1); % Передаваемые данные
-                EncData = Inp_data;
+                IntrData = Inp_data;
             end
-            Inp_Mat = reshape(EncData,length(EncData)/prm.bps,prm.bps); %Группируем биты 
+            Inp_Mat = reshape(IntrData,length(IntrData)/prm.bps,prm.bps); %Группируем биты 
             Inp_Sym = bi2de(Inp_Mat);  % Входные данные в символах
             % SISO
             if flag_coder_RS == 1
                 Inp_data_siso = randi([0 1],prm.n_siso,1); % Передаваемые данные
                 EncData_siso = rsEncoder_siso(Inp_data_siso); % Кодер RS
+                IntrData_siso = randintrlv(EncData_siso,prm.SEED); %Перемежитель
             else
                 Inp_data_siso = randi([0 1],prm.n_siso,1); % Передаваемые данные
-                EncData_siso = Inp_data_siso;
+                IntrData_siso = Inp_data_siso;
             end          
-            Inp_Mat_siso = reshape(EncData_siso,length(EncData_siso)/prm.bps_siso,prm.bps_siso); %Группируем биты 
+            Inp_Mat_siso = reshape(IntrData_siso,length(IntrData_siso)/prm.bps_siso,prm.bps_siso); %Группируем биты 
             Inp_Sym_siso = bi2de(Inp_Mat_siso);  % Входные данные в символах
             % Формируем пилоты для SISO 
             Inp_data_pilot = randi([0 1],prm.n_pilot,1);%  набор пилотов в битах
@@ -196,12 +198,14 @@ for indExp = 1:Exp
             Out_Mat = de2bi(Out_Sym);
             Out_data = Out_Mat(:);
             if(flag_coder_RS == 1)
-                Out_data = rsDecoder(Out_data); % Декодер RS
+                DeintData = randdeintrlv(Out_data,prm.SEED);
+                Out_data = rsDecoder(DeintData); % Декодер RS
             end
             Out_Mat_siso = de2bi(Out_Sym_siso);
             Out_data_siso  = Out_Mat_siso(:);
             if(flag_coder_RS == 1)
-                Out_data_siso = rsDecoder_siso(Out_data_siso); % Декодер RS
+                DeintData_siso = randdeintrlv(Out_data_siso,prm.SEED);
+                Out_data_siso = rsDecoder_siso(DeintData_siso); % Декодер RS
             end
             ErrNum_M = ErrNum_M+sum(abs(Out_data-Inp_data));          
             ErrNum_S = ErrNum_S+sum(abs(Out_data_siso-Inp_data_siso));
@@ -245,7 +249,7 @@ plot_ber(ber_mean,SNR(1:size(ber_mean,2)),prm.bps,'k',1.5,0)
 plot_ber(ber_siso_mean,SNR(1:size(ber_siso_mean,2)),prm.bps_siso,'b',1.5,0)
 legend('Теоретическая qam 4',['MIMO' num2str(prm.M)],...
     ['SISO' num2str(prm.M_siso)])%,"Теоретическая order = 4")
-str = ['DataBase/123corM=' num2str(flag_cor_MIMO) '_' num2str(prm.numTx) 'x' num2str(prm.numRx) '_' flag_chanel '_Wm=' num2str(flag_wav_MIMO)...
+str = ['DataBase/CR=' num2str(K_RS) '_' num2str(N_RS) '_corM=' num2str(flag_cor_MIMO) '_' num2str(prm.numTx) 'x' num2str(prm.numRx) '_' flag_chanel '_Wm=' num2str(flag_wav_MIMO)...
     '_Ws=' num2str(flag_wav_SISO) '_Mm=' num2str(prm.M)...
     '_Ms=' num2str(prm.M_siso) '_Exp=' num2str(Exp) '.mat'];
-% save(str,'ber_mean','ber_siso_mean','SNR','prm','ber','ber_siso')
+save(str,'ber_mean','ber_siso_mean','SNR','prm','ber','ber_siso','M_RS','K_RS','N_RS')
