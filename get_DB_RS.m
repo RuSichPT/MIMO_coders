@@ -59,9 +59,9 @@ if flag_coder_RS == 1
     prm.Nsymb_ofdm = N_RS;
 end
 %% Расчет 
-prm.n = prm.bps*prm.Nsymb_ofdm*prm.numSC*prm.numTx*prm.CodeRate;% Длина бинарного потока
+prm.n = round(prm.bps*prm.Nsymb_ofdm*prm.numSC*prm.numTx*prm.CodeRate);% Длина бинарного потока
 prm.n_pilot = prm.Nsymb_ofdm_p*prm.numSC; % Кол-во бит на пилоты SISO
-prm.n_siso = prm.bps_siso*prm.Nsymb_ofdm*prm.numSC*prm.CodeRate;% Длина бинарного потока
+prm.n_siso = round(prm.bps_siso*prm.Nsymb_ofdm*prm.numSC*prm.CodeRate);% Длина бинарного потока
 %% ---------Сам скрипт--------
 if flag_cor_MIMO == 2
     ostbcEnc = comm.OSTBCEncoder('NumTransmitAntennas',prm.numTx);
@@ -72,7 +72,7 @@ SNR_MAX = snr;
 SNR = 0+floor(10*log10(prm.bps)):SNR_MAX+floor(10*log10(prm.bps*prm.numTx));
 prm.MinNumErr = 100; % Порог ошибок для цикла 
 prm.conf_level = 0.95; % Уровень достоверности
-prm.MAX_indLoop = 65;% Максимальное число итераций в цикле while
+prm.MAX_indLoop = 70;% Максимальное число итераций в цикле while
 Koeff = 1/15;%Кол-во процентов от BER  7%
 Exp = exp;% Кол-во опытов
 for indExp = 1:Exp
