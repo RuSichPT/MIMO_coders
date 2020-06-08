@@ -1,7 +1,7 @@
 %% ---------Модель MIMO and SISO RS-------- 
 clear;clc;%close all;
 %% Управление
-flag_chanel = 'RAYL_SPECIAL';% 'AWGN' ,'RAYL','RIC','RAYL_SPECIAL','STATIC', 'BAD' 
+flag_chanel = 'RAYL';% 'AWGN' ,'RAYL','RIC','RAYL_SPECIAL','STATIC', 'BAD' 
 flag_cor_MIMO = 1; % 1-коррекция АЧХ (эквалайзер для MIMO) 2-Аламоути
 flag_cor_SISO = 1; % коррекция АЧХ (эквалайзер для SISO)
 flag_wav_MIMO = 1; % вейвлет шумоподавление для MIMO
@@ -69,16 +69,18 @@ if flag_cor_MIMO == 2
     ostbcComb = comm.OSTBCCombiner('NumReceiveAntennas',prm.numRx);
     prm.n = prm.n/prm.numTx;
 end
-SNR_MAX = 20;
+SNR_MAX = 100;
 SNR = 0+floor(10*log10(prm.bps)):SNR_MAX+floor(10*log10(prm.bps*prm.numTx));
 prm.MinNumErr = 100; % Порог ошибок для цикла 
 prm.conf_level = 0.95; % Уровень достоверности
-prm.MAX_indLoop = 300;% Максимальное число итераций в цикле while
+prm.MAX_indLoop = 1;% Максимальное число итераций в цикле while
+prm.MaxNumZero = 4; %  max кол-во нулевых точек в цикле while
 Koeff = 1/15;%Кол-во процентов от BER  7%
-Exp = 1;% Кол-во опытов
+Exp = 70;% Кол-во опытов
 for indExp = 1:Exp
     %% Создание канала
-    [H,H_siso] = create_chanel(flag_chanel,prm);  
+    [H,H_siso] = create_chanel(flag_chanel,prm);
+    NumZero = 0; % кол-во нулевых точек
     for indSNR = 1:length(SNR)
         berconf_M = 0;
         berconf_S = 0;
@@ -89,6 +91,9 @@ for indExp = 1:Exp
         LenIntLoop_M = 100;
         condition_M = ((LenIntLoop_M > berconf_M*Koeff)||(ErrNum_M < prm.MinNumErr));
         condition_S = ((LenIntLoop_S > berconf_S*Koeff)||(ErrNum_S < prm.MinNumErr));
+        if (NumZero >= prm.MaxNumZero)
+            break;
+        end
         while (condition_M || condition_S) && (indLoop < prm.MAX_indLoop)
             %% Формируем данные 
             if flag_coder_RS == 1
@@ -218,6 +223,9 @@ for indExp = 1:Exp
             condition_M = ((LenIntLoop_M > berconf_M/15)||(ErrNum_M < prm.MinNumErr));
             condition_S = ((LenIntLoop_S > berconf_S/15)||(ErrNum_S < prm.MinNumErr));
         end
+        if (ErrNum_M == 0)&&(ErrNum_S==0)
+            NumZero = NumZero+1;
+        end
         ber(indExp,indSNR) = berconf_M;
         ber_siso(indExp,indSNR) = berconf_S;
 %         ber1(indExp,indSNR) = ErrNum_M/(indLoop*length(Inp_data));
@@ -229,7 +237,8 @@ for indExp = 1:Exp
             ErrNum_disp = ErrNum_M;
             name = 'Er_MIMO';
         end
-        fprintf(['Complete %d db ' name ' = %d, ind = %d\n'],SNR(indSNR),ErrNum_disp,indLoop);
+        fprintf(['Complete %d db ' name ' = %d, ind = %d NZ = %d\n'],...
+                SNR(indSNR),ErrNum_disp,indLoop,NumZero);
     end
     fprintf('Exp %d  \n',indExp);
 end
@@ -252,4 +261,4 @@ legend('Теоретическая qam 4',['MIMO' num2str(prm.M)],...
 str = ['DataBase/CR=' num2str(K_RS) '_' num2str(N_RS) '_corM=' num2str(flag_cor_MIMO) '_' num2str(prm.numTx) 'x' num2str(prm.numRx) '_' flag_chanel '_Wm=' num2str(flag_wav_MIMO)...
     '_Ws=' num2str(flag_wav_SISO) '_Mm=' num2str(prm.M)...
     '_Ms=' num2str(prm.M_siso) '_Exp=' num2str(Exp) '.mat'];
-save(str,'ber_mean','ber_siso_mean','SNR','prm','ber','ber_siso','M_RS','K_RS','N_RS')
+% save(str,'ber_mean','ber_siso_mean','SNR','prm','ber','ber_siso','M_RS','K_RS','N_RS')
