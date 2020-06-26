@@ -1,7 +1,7 @@
 %% ---------Модель MIMO and SISO RS-------- 
 clear;clc;%close all;
 %% Управление
-flag_chanel = 'RAYL';% 'AWGN' ,'RAYL','RIC','RAYL_SPECIAL','STATIC', 'BAD' 
+flag_chanel = 'RAYL_SPECIAL';% 'AWGN' ,'RAYL','RIC','RAYL_SPECIAL','STATIC', 'BAD' 
 flag_cor_MIMO = 1; % 1-коррекция АЧХ (эквалайзер для MIMO) 2-Аламоути
 flag_cor_SISO = 1; % коррекция АЧХ (эквалайзер для SISO)
 flag_wav_MIMO = 1; % вейвлет шумоподавление для MIMO
@@ -22,7 +22,7 @@ prm.Nsymb_ofdm_p = 1; % Кол-во пилотных символов OFDM
 %% Параметры кодера
 M_RS = 5; % Кол-во бит на символ , задаем поле Галуа, степень полинома ДБ 3 <= M_RS <= 16.
 N_RS_max = 2^M_RS-1;
-K_RS = 9; % Кол-во символов RS сообщения ДБ N_RS-K_RS= 2t, где t - кол-во исправимых ошибок
+K_RS = 23; % Кол-во символов RS сообщения ДБ N_RS-K_RS= 2t, где t - кол-во исправимых ошибок
 N_RS = N_RS_max; % Кол-во символов RS кодового слова  ДБ N_RS_max>=N_RS 
 %% Параметры OFDM 
 prm.numSC = 450; % Кол-во поднессущих
@@ -33,7 +33,7 @@ prm.tmp_NCI = prm.N_FFT - prm.numSC;
 prm.NullCarrierIndices = [1:prm.tmp_NCI/2 prm.N_FFT-prm.tmp_NCI/2+1:prm.N_FFT]'; % Guards and DC
 %% Параметры канала
 prm.KFactor = 1;% Для 'RIC'
-prm.SEED = 122;% Для 'RAYL_SPECIAL' 586 122 12   
+prm.SEED = 86;% Для 'RAYL_SPECIAL' 586 122 12   
 prm.SampleRate = 40e6;
 dt = 1/prm.SampleRate;
 switch flag_chanel
@@ -76,7 +76,7 @@ prm.conf_level = 0.95; % Уровень достоверности
 prm.MAX_indLoop = 1;% Максимальное число итераций в цикле while
 prm.MaxNumZero = 4; %  max кол-во нулевых точек в цикле while
 Koeff = 1/15;%Кол-во процентов от BER  7%
-Exp = 70;% Кол-во опытов
+Exp = 1;% Кол-во опытов
 for indExp = 1:Exp
     %% Создание канала
     [H,H_siso] = create_chanel(flag_chanel,prm);
@@ -247,8 +247,9 @@ if flag_cor_MIMO ~= 2
 end
 ber_mean = mean(ber,1);
 ber_siso_mean = mean(ber_siso,1);
-Eb_N0_M = SNR(1:size(ber_mean,2))-(10*log10(prm.bps));
-Eb_N0_S = SNR(1:size(ber_mean,2))-(10*log10(prm.bps_siso));
+SNR = SNR(1:max(size(ber_siso_mean,2),size(ber_mean,2)));
+Eb_N0_M = SNR-(10*log10(prm.bps));
+Eb_N0_S = SNR-(10*log10(prm.bps_siso));
 Eb_N0 = 0:60;
 ther_ber_1 = berfading(Eb_N0,'qam',4,1);
 % ther_ber_1 = berawgn(Eb_N0,'qam',128);
